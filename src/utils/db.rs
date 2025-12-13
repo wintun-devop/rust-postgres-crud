@@ -12,3 +12,5 @@ pub async fn init_db() -> Db {
     println!("✅ Connected to Postgres at {}", url);
     pool
 }
+
+

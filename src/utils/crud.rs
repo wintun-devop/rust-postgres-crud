@@ -1,69 +1,39 @@
 use serde::{Deserialize, Serialize};
-use serde_json::{Result,Value,json};
 use uuid::Uuid;
-use hyper::{Request, Response, StatusCode};
-use hyper::body::Body;
 use sqlx::PgPool;
-
-
+use sqlx::Error as SqlxError;
 
 type Db = PgPool;
 
-#[derive(Serialize, Deserialize, sqlx::FromRow)]
-pub struct User {
+#[derive(Debug,Serialize, Deserialize, sqlx::FromRow)]
+pub struct Items {
     pub id: String,
     pub name: String,
-    pub email: String,
+    pub model: String,
 }
 
 #[derive(Deserialize)]
-pub struct CreateUser {
+pub struct CreateItem {
     pub name: String,
-    pub email: String,
+    pub model: String,
 }
 
-#[derive(Deserialize)]
-pub struct UpdateUser {
-    pub name: Option<String>,
-    pub email: Option<String>,
+pub async fn create_item(payload: CreateItem, db: &Db) -> Result<Items, SqlxError> {
+    // generate id (or omit and let DB generate it)
+    let new_id = Uuid::new_v4();
+
+    // Use query_as with explicit RETURNING columns
+    let item = sqlx::query_as::<_, Items>(
+        r#"
+        INSERT INTO esm_items (id, name, model)
+        VALUES ($1, $2, $3)
+        RETURNING id, name, model
+        "#
+    )
+    .bind(new_id)
+    .bind(&payload.name)
+    .bind(&payload.model)
+    .fetch_one(db)
+    .await?;
+    Ok(item)
 }
-
-/// Create user handler: expects JSON body matching CreateUser.
-/// Returns 201 Created with the created user JSON on success.
-
-pub async fn create_user(db: Db) -> Result<Value> {
-   let _a = db;
-   let v = json!({ "status": "ok", "id": 1 });
-   Ok(v)
-}
-
-// Helper to build a JSON error response with a message.
-// fn json_error(status: StatusCode, message: &str) -> Response<Body> {
-//     let payload = serde_json::json!({ "error": message });
-//     let body = serde_json::to_string(&payload).unwrap_or_else(|_| r#"{"error":"internal"}"#);
-//     Response::builder()
-//         .status(status)
-//         .header("Content-Type", "application/json")
-//         .body(Body::from(body))
-//         .unwrap()
-// }
-
-// pub fn build_response<T: Serialize>(status: StatusCode, body_obj: T) -> Response<dyn Body> {
-//     let body = match serde_json::to_string(&body_obj) {
-//         Ok(s) => s,
-//         Err(_) => return {
-//             let err = r#"{"error":"serialization error"}"#;
-//             Response::builder()
-//                 .status(StatusCode::INTERNAL_SERVER_ERROR)
-//                 .header("content-type", "application/json")
-//                 .body(Body::from(err))
-//                 .unwrap()
-//         }
-//     };
-
-//     Response::builder()
-//         .status(status)
-//         .header("content-type", "application/json")
-//         .body(Body::from(body))
-//         .unwrap()
-// }
