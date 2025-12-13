@@ -1,16 +1,25 @@
-use sqlx::{Pool, Postgres};
-pub type Db = Pool<Postgres>;
-use crate::config::config;
+use sqlx::PgPool;
+use tokio::sync::OnceCell;
 
-pub async fn init_db() -> Db {
-    let url = config().db_url;
-    let pool = sqlx::postgres::PgPoolOptions::new()
-        .max_connections(5)
-        .connect(&url)
-        .await
-        .expect("Failed to connect to Postgres");
-    println!("✅ Connected to Postgres at {}", url);
-    pool
+static POOL: OnceCell<PgPool> = OnceCell::const_new();
+
+pub async fn init_db(database_url: &str) -> Result<(), sqlx::Error> {
+    // If already initialized, do nothing
+    if POOL.get().is_some() {
+        return Ok(());
+    }
+    // Create the pool (propagate sqlx errors)
+    let pool = PgPool::connect(database_url).await?;
+
+    // Try to set the global OnceCell. If another task set it concurrently, ignore.
+    let _ = POOL.set(pool);
+    Ok(())
 }
 
-
+/// Get a clone of the global pool. Panics if init_db was not called.
+pub fn get_pool() -> PgPool {
+    POOL
+        .get()
+        .expect("POOL not initialized; call init_db() in main before using get_pool()")
+        .clone()
+}
