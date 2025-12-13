@@ -1,29 +1,39 @@
 mod config;
 mod utils;
-use sqlx::PgPool;
-use utils::crud::{CreateItem, create_item};
+use utils::crud::{CreateItem,UpdateItem, create_item, get_all_items, update_item};
 use utils::hello::say_hello;
-use utils::db::{init_db,get_pool};
+
+use crate::utils::db;
 
 #[tokio::main]
-async fn main()  -> Result<(), Box<dyn std::error::Error + Send + Sync>>{
+async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     println!("Welcome");
     say_hello(1).await;
     say_hello(2).await;
-    let database_url = config::config().db_url;
-    // initialize global pool once
-    init_db(&database_url).await?;
-
-    // obtain a clone of the pool when you need it
-    let pool: PgPool = get_pool();
-
+    let pool = db::get_pool().await?;
     let item_payload = CreateItem {
-        name: "Widget103".to_string(),
-        model: "X103".to_string(),
+        name: "Widget202".to_string(),
+        model: "X202".to_string(),
     };
     match create_item(item_payload, &pool).await {
         Ok(created) => println!("Created item:\n{:#?}", created),
         Err(e) => eprintln!("Failed to create item: {}", e),
     }
+    // list
+    let all = get_all_items(&pool).await?;
+    println!("{:#?}", all);
+    // update (partial)
+    let _updated = update_item(
+        "273e1a14-5bdc-4df8-be84-2ab18cdc553d",
+        UpdateItem {
+            name: "Widget104".to_string(),
+            model: "X104".to_string(),
+        },
+        &pool,
+    )
+    .await?;
+    // delete
+    // let deleted = delete_item(&created.id, &pool).await?;
+
     Ok(())
 }

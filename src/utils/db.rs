@@ -16,10 +16,13 @@ pub async fn init_db(database_url: &str) -> Result<(), sqlx::Error> {
     Ok(())
 }
 
-/// Get a clone of the global pool. Panics if init_db was not called.
-pub fn get_pool() -> PgPool {
-    POOL
-        .get()
-        .expect("POOL not initialized; call init_db() in main before using get_pool()")
-        .clone()
+
+
+pub async fn get_pool() -> Result<PgPool, sqlx::Error> {
+    if POOL.get().is_none() {
+        // lazy initialize using config if not already initialized
+        let database_url = crate::config::config().db_url;
+        init_db(&database_url).await?;
+    }
+    Ok(POOL.get().expect("pool initialized").clone())
 }
